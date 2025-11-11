@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Order Rumah Kita</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #FFF8F3; }
+        .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
+        .orange-gradient { background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%); }
+        
+        /* Toast Styles */
+        #toast-container { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 350px; pointer-events: none; }
+        .toast-item { background: rgba(0,0,0,0.8); color: white; padding: 12px 20px; border-radius: 50px; font-size: 14px; text-align: center; backdrop-filter: blur(4px); animation: fadeToast 0.3s ease-out forwards; pointer-events: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 8px; }
+        @keyframes fadeToast { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="text-gray-800 pb-28 relative min-h-screen">
+
+    <div id="toast-container"></div>
+
+    <nav class="fixed top-0 left-0 right-0 z-40 glass-nav border-b border-white/50 shadow-sm">
+        <div class="max-w-md mx-auto px-5 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-full orange-gradient flex items-center justify-center text-white font-bold shadow-md">R</div>
+                <div>
+                    <h1 class="font-bold text-lg leading-none">Rumah Kita</h1>
+                    <p class="text-[10px] text-orange-500 font-bold tracking-wider uppercase">Outlet & Cafe</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                 <button onclick="openHistory()" class="w-8 h-8 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shadow-sm border border-orange-100">
+                    <i class="fas fa-history text-xs"></i>
+                </button>
+                <div class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> BUKA
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="pt-20 px-4 max-w-md mx-auto pb-4">
+        <div class="mb-6 orange-gradient rounded-3xl p-6 text-white shadow-xl shadow-orange-200 relative overflow-hidden">
+             <h2 class="text-2xl font-extrabold relative z-10">Mau Makan Apa?</h2>
+             <p class="relative z-10 text-white/90 text-sm">Ongkir cuma 2rb sesama desa!</p>
+             <div class="absolute -right-4 -bottom-6 text-8xl opacity-30 rotate-12">🍕</div>
+        </div>
+
+        <div id="menu-grid" class="grid grid-cols-2 gap-4">
+            <div class="col-span-2 flex flex-col items-center py-12 text-slate-400">
+                <i class="fas fa-circle-notch fa-spin text-2xl mb-2"></i>
+                <p class="text-sm">Memuat Menu...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Buttons -->
+    <div class="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-3">
+        <!-- Contact Admin Button -->
+        <a href="https://wa.me/6288228665260?text=Halo%20Admin%20Outlet%20Rumah%20Kita%2C%20saya%20mau%20tanya..." target="_blank" class="self-end bg-emerald-500 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 hover:bg-emerald-600 transition">
+            <i class="fab fa-whatsapp text-lg"></i> Chat Admin
+        </a>
+
+        <!-- Cart Button -->
+        <button onclick="openCart()" id="float-cart-btn" class="w-full bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex justify-between items-center transform translate-y-32 transition-transform duration-500">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center font-bold text-sm shadow-lg" id="cart-count">0</div>
+                <div class="text-left"><p class="text-xs text-slate-400">Total</p><p class="font-bold text-sm" id="cart-total-display">Rp 0</p></div>
+            </div>
+            <div class="flex items-center gap-2 text-sm font-bold text-orange-400">Check Out <i class="fas fa-arrow-right"></i></div>
+        </button>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-end justify-center">
+        <div class="bg-white w-full max-w-md h-[80vh] rounded-t-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="font-bold text-xl text-slate-800">Riwayat Pesanan</h2>
+                <button onclick="closeHistory()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" id="history-list">
+                <div class="text-center text-slate-400 py-10 text-sm">Belum ada riwayat pesanan.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-end justify-center">
+        <div class="bg-white w-full max-w-md h-[90vh] rounded-t-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="font-bold text-xl text-slate-800">Keranjang</h2>
+                <button onclick="closeCart()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center"><i class="fas fa-times text-slate-400"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" id="cart-items"></div>
+            
+            <div class="p-6 border-t border-slate-100 bg-white">
+                <form id="order-form" class="space-y-4">
+                    <div class="grid grid-cols-1 gap-3">
+                        <input type="text" id="c-name" required placeholder="Nama Lengkap" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium">
+                        <input type="tel" id="c-phone" required placeholder="Nomor WhatsApp (08...)" pattern="^08[0-9]{8,}$" title="Format harus 08xxxxxxxx" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium">
+                        <textarea id="c-address" required placeholder="Alamat (Desa/Jalan/RT RW)" rows="2" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Jarak</label>
+                            <select id="c-zone" class="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:border-orange-400"><option value="near" data-price="2000">Dekat (2rb)</option><option value="mid" data-price="5000">Luar Desa (5rb)</option><option value="far" data-price="0">Jauh (X)</option></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Bayar</label>
+                            <select id="c-payment" class="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:border-orange-400"><option value="COD">COD</option><option value="QRIS">QRIS</option><option value="DANA">DANA</option></select>
+                        </div>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
+                         <div class="text-xs text-orange-800"><p>Subtotal: <span id="sum-sub">0</span></p><p>Ongkir: <span id="sum-fee">0</span></p></div>
+                         <div class="text-xl font-extrabold text-orange-600" id="sum-total">Rp 0</div>
+                    </div>
+                    <button type="submit" id="btn-submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-xl active:scale-95 transition">Pesan & Konfirmasi WA</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="success-overlay" class="fixed inset-0 bg-white z-[60] hidden flex-col items-center justify-center text-center p-8">
+        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-500 text-3xl mb-4 animate-bounce"><i class="fas fa-check"></i></div>
+        <h2 class="text-2xl font-bold mb-2">Pesanan Terkirim!</h2>
+        <p class="text-sm text-slate-500 mb-4">Silakan konfirmasi ke Admin agar segera diproses.</p>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6"><p class="text-xs text-slate-400 uppercase mb-1">Kode Antrian</p><h1 class="text-4xl font-mono font-bold text-slate-800" id="final-code">Q-???</h1></div>
+        <a id="wa-confirm-btn" href="#" target="_blank" class="bg-emerald-500 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-emerald-600 transition mb-3 w-full block">
+            <i class="fab fa-whatsapp"></i> Hubungi Admin
+        </a>
+        <button onclick="location.reload()" class="text-slate-400 text-sm font-bold hover:text-slate-600">Tutup</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, getDocs, query, where, documentId } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        function showToast(msg, icon='info') {
+            const box = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            const iconHtml = icon === 'success' ? '<i class="fas fa-check-circle text-green-400"></i>' : '<i class="fas fa-info-circle text-blue-400"></i>';
+            el.className = 'toast-item';
+            el.innerHTML = `${iconHtml} <span>${msg}</span>`;
+            box.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
+        }
+
+        function generateQueueCode() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const random = Math.floor(1000 + Math.random() * 9000); 
+            return `Q-${day}${month}-${random}`;
+        }
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVl_0OhaCKRiJ5-qPKwaoMs3q11tHRbys",
+            authDomain: "outlet-rumah-kita.firebaseapp.com",
+            projectId: "outlet-rumah-kita",
+            storageBucket: "outlet-rumah-kita.firebasestorage.app",
+            messagingSenderId: "1081923667869",
+            appId: "1:1081923667869:web:797fce3cc6de79d2c69174"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const COL_MENU = 'cafe_menu';
+        const COL_ORDERS = 'cafe_orders';
+        const ADMIN_WA = "6288228665260";
+
+        let cart = [], menu = [];
+
+        signInAnonymously(auth).then(() => {
+            showToast("Terhubung!", 'success');
+            onSnapshot(collection(db, COL_MENU), snap => {
+                menu = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                renderMenu();
+            });
+        }).catch(e => showToast("Gagal Konek Database"));
+
+        function renderMenu() {
+            const grid = document.getElementById('menu-grid');
+            if(menu.length === 0) { grid.innerHTML = '<div class="col-span-2 text-center py-10 text-slate-400">Menu belum tersedia.</div>'; return; }
+            grid.innerHTML = menu.map(item => `
+                <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-full group">
+                    <div class="bg-orange-50 h-32 rounded-xl mb-3 overflow-hidden relative">
+                        <img src="${item.imageUrl || `https://placehold.co/300x300/fff7ed/fdba74?text=${item.name.charAt(0)}`}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/300x300?text=Img'">
+                    </div>
+                    <h3 class="font-bold text-slate-800 mb-1 line-clamp-2">${item.name}</h3>
+                    <div class="mt-auto flex justify-between items-center">
+                        <span class="font-bold text-orange-600">Rp ${parseInt(item.price).toLocaleString()}</span>
+                        <button onclick="window.addToCart('${item.id}')" class="w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center shadow active:scale-90 transition"><i class="fas fa-plus text-xs"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.addToCart = (id) => {
+            const item = menu.find(m => m.id === id); const exist = cart.find(c => c.id === id);
+            if(exist) exist.qty++; else cart.push({...item, qty: 1});
+            updateCartUI(); showToast("Masuk keranjang", 'success');
+            const btn = document.getElementById('float-cart-btn');
+            btn.classList.add('scale-105', 'bg-orange-600'); setTimeout(() => btn.classList.remove('scale-105', 'bg-orange-600'), 200);
+        }
+
+        window.updateQty = (id, delta) => { const idx = cart.findIndex(c => c.id === id); if(idx > -1) { cart[idx].qty += delta; if(cart[idx].qty <= 0) cart.splice(idx, 1); renderCartItems(); updateCartUI(); } }
+        function updateCartUI() {
+            const cnt = cart.reduce((a,b) => a+b.qty, 0); const tot = cart.reduce((a,b) => a+(b.price*b.qty), 0);
+            document.getElementById('cart-count').textContent = cnt; document.getElementById('cart-total-display').textContent = 'Rp ' + tot.toLocaleString();
+            const btn = document.getElementById('float-cart-btn'); btn.classList.toggle('translate-y-32', cnt === 0); calcTotal();
+        }
+        function renderCartItems() {
+            const el = document.getElementById('cart-items'); if(cart.length===0) { el.innerHTML='<div class="text-center text-slate-400 py-4">Kosong.</div>'; return; }
+            el.innerHTML = cart.map(item => `<div class="flex items-center gap-3 bg-white border border-slate-100 p-2 rounded-xl"><div class="w-12 h-12 bg-slate-100 rounded-lg overflow-hidden shrink-0"><img src="${item.imageUrl || `https://placehold.co/100x100/fff7ed/fdba74?text=${item.name.charAt(0)}`}" class="w-full h-full object-cover"></div><div class="flex-1"><h4 class="font-bold text-sm truncate">${item.name}</h4><p class="text-xs text-slate-500">Rp ${item.price.toLocaleString()}</p></div><div class="flex items-center gap-2 bg-slate-50 rounded-full px-2 py-1"><button onclick="updateQty('${item.id}', -1)" class="w-5 h-5 bg-white shadow rounded-full text-xs">-</button><span class="text-sm font-bold w-3 text-center">${item.qty}</span><button onclick="updateQty('${item.id}', 1)" class="w-5 h-5 bg-slate-800 text-white shadow rounded-full text-xs">+</button></div></div>`).join('');
+        }
+        function calcTotal() {
+            const sub = cart.reduce((a,b) => a+(b.price*b.qty), 0); const zone = document.getElementById('c-zone'); const fee = parseInt(zone.options[zone.selectedIndex].dataset.price); const isFar = zone.value === 'far';
+            document.getElementById('sum-sub').textContent = sub.toLocaleString(); document.getElementById('sum-fee').textContent = fee.toLocaleString(); document.getElementById('sum-total').textContent = 'Rp ' + (sub+fee).toLocaleString();
+            const btn = document.getElementById('btn-submit'); if(isFar || cart.length===0) { btn.disabled=true; btn.classList.add('opacity-50'); } else { btn.disabled=false; btn.classList.remove('opacity-50'); }
+        }
+
+        document.getElementById('c-zone').addEventListener('change', calcTotal);
+        document.getElementById('order-form').addEventListener('submit', async (e) => {
+            e.preventDefault(); if(cart.length===0) return;
+            
+            // Validate phone
+            const phone = document.getElementById('c-phone').value.trim();
+            if (!phone.startsWith('08')) { alert('Nomor WA harus diawali 08...'); return; }
+
+            const btn = document.getElementById('btn-submit'); btn.innerText = "Mengirim..."; btn.disabled = true;
+            const zone = document.getElementById('c-zone'); const fee = parseInt(zone.options[zone.selectedIndex].dataset.price);
+            const sub = cart.reduce((a,b) => a+(b.price*b.qty), 0);
+            const qc = generateQueueCode();
+            const customerName = document.getElementById('c-name').value;
+            
+            try {
+                const docRef = await addDoc(collection(db, COL_ORDERS), {
+                    customerName: customerName, 
+                    customerPhone: phone,
+                    address: document.getElementById('c-address').value,
+                    items: cart, subtotal: sub, deliveryFee: fee, total: sub+fee, paymentMethod: document.getElementById('c-payment').value,
+                    source: 'online', status: 'pending', timestamp: serverTimestamp(), queueCode: qc
+                });
+
+                // Save to history local storage
+                saveOrderHistory(docRef.id);
+
+                // Show Success
+                document.getElementById('cart-modal').classList.add('hidden'); document.getElementById('cart-modal').classList.remove('flex');
+                document.getElementById('success-overlay').classList.remove('hidden'); document.getElementById('success-overlay').classList.add('flex');
+                document.getElementById('final-code').textContent = qc; 
+                
+                // Setup WA Button
+                const waMsg = `Halo Admin, saya sudah pesan di web.\n\nKode: *${qc}*\nNama: ${customerName}\nTotal: Rp ${(sub+fee).toLocaleString()}\n\nMohon dikonfirmasi ya, terima kasih!`;
+                document.getElementById('wa-confirm-btn').href = `https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(waMsg)}`;
+                
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#ff7e5f', '#feb47b'] });
+                cart=[]; updateCartUI();
+            } catch(err) { console.error(err); showToast("Gagal kirim: "+err.code); btn.innerText="Pesan Sekarang"; btn.disabled=false; }
+        });
+
+        // History Logic
+        function saveOrderHistory(id) {
+            let h = JSON.parse(localStorage.getItem('ork_history') || '[]');
+            h.push(id);
+            if(h.length > 10) h.shift(); // keep last 10
+            localStorage.setItem('ork_history', JSON.stringify(h));
+        }
+
+        window.openHistory = async () => {
+            const modal = document.getElementById('history-modal');
+            const list = document.getElementById('history-list');
+            modal.classList.remove('hidden'); modal.classList.add('flex');
+            list.innerHTML = '<div class="text-center py-10"><i class="fas fa-circle-notch fa-spin text-slate-400"></i></div>';
+
+            const h = JSON.parse(localStorage.getItem('ork_history') || '[]');
+            if(h.length === 0) {
+                list.innerHTML = '<div class="text-center text-slate-400 py-10 text-sm">Belum ada riwayat pesanan di HP ini.</div>';
+                return;
+            }
+
+            try {
+                // Firestore 'in' query limit is 10, perfect.
+                const q = query(collection(db, COL_ORDERS), where(documentId(), 'in', h));
+                const snap = await getDocs(q);
+                const orders = snap.docs.map(d => d.data()).sort((a,b) => b.timestamp?.seconds - a.timestamp?.seconds);
+
+                list.innerHTML = orders.map(o => {
+                    let stClass = 'bg-slate-100 text-slate-500';
+                    let stText = 'Pending';
+                    if(o.status === 'confirmed') { stClass = 'bg-emerald-100 text-emerald-600'; stText = 'Dikonfirmasi / Dimasak'; }
+                    if(o.status === 'cancelled') { stClass = 'bg-red-100 text-red-600'; stText = 'Dibatalkan'; }
+                    if(o.status === 'completed') { stClass = 'bg-blue-100 text-blue-600'; stText = 'Selesai'; }
+
+                    return `
+                        <div class="bg-white border border-slate-100 p-4 rounded-xl shadow-sm mb-3">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <span class="font-bold text-lg text-slate-800">${o.queueCode}</span>
+                                    <p class="text-xs text-slate-400">${new Date(o.timestamp?.seconds*1000).toLocaleDateString()}</p>
+                                </div>
+                                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${stClass}">${stText}</span>
+                            </div>
+                            <div class="text-sm text-slate-600 mb-2">
+                                ${o.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-slate-50">
+                                <span class="font-bold text-orange-600">Rp ${parseInt(o.total).toLocaleString()}</span>
+                                <a href="https://wa.me/${ADMIN_WA}?text=Halo%20Admin%2C%20cek%20status%20pesanan%20*${o.queueCode}*%20dong." target="_blank" class="text-xs font-bold text-emerald-500 hover:underline">Tanya Admin</a>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch(e) {
+                list.innerHTML = '<div class="text-center text-red-400 py-10 text-sm">Gagal memuat riwayat.</div>';
+                console.error(e);
+            }
+        }
+        window.closeHistory = () => { document.getElementById('history-modal').classList.add('hidden'); document.getElementById('history-modal').classList.remove('flex'); }
+
+        window.openCart = () => { renderCartItems(); document.getElementById('cart-modal').classList.remove('hidden'); document.getElementById('cart-modal').classList.add('flex'); calcTotal(); }
+        window.closeCart = () => { document.getElementById('cart-modal').classList.add('hidden'); document.getElementById('cart-modal').classList.remove('flex'); }
+    </script>
+    <style> @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; } </style>
+</body>
+</html>
