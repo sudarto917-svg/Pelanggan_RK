@@ -17,6 +17,12 @@
         #toast-container { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 350px; pointer-events: none; }
         .toast-item { background: rgba(0,0,0,0.8); color: white; padding: 12px 20px; border-radius: 50px; font-size: 14px; text-align: center; backdrop-filter: blur(4px); animation: fadeToast 0.3s ease-out forwards; pointer-events: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; gap: 8px; }
         @keyframes fadeToast { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Animation for Modals */
+        @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } 
+        .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes zoom-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .animate-zoom-in { animation: zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 </head>
 <body class="text-gray-800 pb-28 relative min-h-screen">
@@ -36,8 +42,12 @@
                  <button onclick="openHistory()" class="w-8 h-8 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center shadow-sm border border-orange-100">
                     <i class="fas fa-history text-xs"></i>
                 </button>
-                <div class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> BUKA
+                <div class="text-right">
+                    <div class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> BUKA
+                    </div>
+                    <!-- FITUR JAM BARU -->
+                    <div id="clock" class="text-[10px] text-slate-500 font-mono mt-0.5" style="letter-spacing: -0.5px;"></div>
                 </div>
             </div>
         </div>
@@ -111,7 +121,11 @@
                         </div>
                         <div>
                             <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Bayar</label>
-                            <select id="c-payment" class="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:border-orange-400"><option value="COD">COD</option><option value="QRIS">QRIS</option><option value="DANA">DANA</option></select>
+                            <!-- (DIUBAH) Opsi pembayaran disederhanakan -->
+                            <select id="c-payment" class="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:border-orange-400">
+                                <option value="Cash">Cash</option>
+                                <option value="QRIS">QRIS</option>
+                            </select>
                         </div>
                     </div>
                     <div class="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
@@ -124,6 +138,20 @@
         </div>
     </div>
 
+    <!-- Payment QR Modal -->
+    <div id="payment-qr-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] hidden items-center justify-center p-6">
+        <div class="bg-white w-full max-w-xs rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-zoom-in p-6 text-center">
+            <h2 id="payment-qr-title" class="font-bold text-xl text-slate-800 mb-3">Pembayaran QRIS</h2>
+            <p class="text-sm text-slate-500 mb-4">Silakan scan kode di bawah ini untuk membayar.</p>
+            <div class="w-full aspect-square bg-slate-100 rounded-xl mb-4 overflow-hidden">
+                <img id="payment-qr-image" src="" alt="Kode Pembayaran" class="w-full h-full object-contain">
+            </div>
+            <button id="payment-qr-continue" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold shadow-xl active:scale-95 transition mb-2">Sudah Bayar & Lanjutkan</form>
+            <button id="payment-qr-cancel" class="w-full text-slate-500 text-sm font-medium py-2">Batal</button>
+        </div>
+    </div>
+
+    <!-- Success Overlay -->
     <div id="success-overlay" class="fixed inset-0 bg-white z-[60] hidden flex-col items-center justify-center text-center p-8">
         <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-500 text-3xl mb-4 animate-bounce"><i class="fas fa-check"></i></div>
         <h2 class="text-2xl font-bold mb-2">Pesanan Terkirim!</h2>
@@ -139,6 +167,12 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, getDocs, query, where, documentId } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- (DIUBAH) LINK GAMBAR QRIS SUDAH DIMASUKKAN ---
+        const QRIS_IMAGE_URL = "https://i.imgur.com/H1qne2I.jpeg"; // Link QRIS Anda
+        // Link DANA dihapus
+        // --- BATAS UBAH LINK ---
+
 
         function showToast(msg, icon='info') {
             const box = document.getElementById('toast-container');
@@ -157,6 +191,28 @@
             const random = Math.floor(1000 + Math.random() * 9000); 
             return `Q-${day}${month}-${random}`;
         }
+
+        // --- FUNGSI JAM DIGITAL ---
+        function updateClock() {
+            const now = new Date();
+            const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+            const day = days[now.getDay()];
+            const date = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            
+            const clockEl = document.getElementById('clock');
+            if (clockEl) {
+                clockEl.textContent = `${day}, ${date}/${month} ${h}:${m}:${s}`;
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+        // --- BATAS FUNGSI JAM ---
+
 
         const firebaseConfig = {
             apiKey: "AIzaSyCVl_0OhaCKRiJ5-qPKwaoMs3q11tHRbys",
@@ -226,46 +282,118 @@
         }
 
         document.getElementById('c-zone').addEventListener('change', calcTotal);
-        document.getElementById('order-form').addEventListener('submit', async (e) => {
-            e.preventDefault(); if(cart.length===0) return;
-            
-            // Validate phone
-            const phone = document.getElementById('c-phone').value.trim();
-            if (!phone.startsWith('08')) { alert('Nomor WA harus diawali 08...'); return; }
 
-            const btn = document.getElementById('btn-submit'); btn.innerText = "Mengirim..."; btn.disabled = true;
-            const zone = document.getElementById('c-zone'); const fee = parseInt(zone.options[zone.selectedIndex].dataset.price);
+        // --- (DIUBAH) LOGIKA SUBMIT FORM DISESUAIKAN ---
+        document.getElementById('order-form').addEventListener('submit', async (e) => {
+            e.preventDefault(); 
+            if(cart.length === 0) return;
+            
+            const phone = document.getElementById('c-phone').value.trim();
+            if (!phone.startsWith('08')) { 
+                showToast('Nomor WA harus diawali 08...', 'info'); 
+                return; 
+            }
+
+            const paymentMethod = document.getElementById('c-payment').value;
+            const btn = document.getElementById('btn-submit'); 
+            btn.innerText = "Memvalidasi..."; 
+            btn.disabled = true;
+
+            if (paymentMethod === 'QRIS') {
+                // Jika QRIS, tampilkan modal dulu
+                openPaymentModal(); // Tidak perlu parameter lagi
+            } else {
+                // Jika Cash, langsung proses
+                await processOrder();
+            }
+        });
+
+        // --- (DIUBAH) FUNGSI MODAL PEMBAYARAN DISESUAIKAN ---
+        function openPaymentModal() {
+            const titleEl = document.getElementById('payment-qr-title');
+            const imgEl = document.getElementById('payment-qr-image');
+            const modal = document.getElementById('payment-qr-modal');
+
+            // Selalu tampilkan QRIS karena DANA sudah dihapus
+            titleEl.textContent = 'Pembayaran QRIS';
+            imgEl.src = QRIS_IMAGE_URL;
+            imgEl.alt = 'Kode QRIS';
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // --- FUNGSI UNTUK MEMPROSES ORDER (TETAP SAMA) ---
+        async function processOrder() {
+            const btn = document.getElementById('btn-submit');
+            btn.innerText = "Mengirim..."; 
+            btn.disabled = true;
+            
+            // Tutup modal QR jika terbuka
+            document.getElementById('payment-qr-modal').classList.add('hidden');
+            document.getElementById('payment-qr-modal').classList.remove('flex');
+            
+            const zone = document.getElementById('c-zone'); 
+            const fee = parseInt(zone.options[zone.selectedIndex].dataset.price);
             const sub = cart.reduce((a,b) => a+(b.price*b.qty), 0);
             const qc = generateQueueCode();
             const customerName = document.getElementById('c-name').value;
+            const phone = document.getElementById('c-phone').value.trim();
             
             try {
                 const docRef = await addDoc(collection(db, COL_ORDERS), {
                     customerName: customerName, 
                     customerPhone: phone,
                     address: document.getElementById('c-address').value,
-                    items: cart, subtotal: sub, deliveryFee: fee, total: sub+fee, paymentMethod: document.getElementById('c-payment').value,
-                    source: 'online', status: 'pending', timestamp: serverTimestamp(), queueCode: qc
+                    items: cart, 
+                    subtotal: sub, 
+                    deliveryFee: fee, 
+                    total: sub+fee, 
+                    paymentMethod: document.getElementById('c-payment').value,
+                    source: 'online', 
+                    status: 'pending', 
+                    timestamp: serverTimestamp(), 
+                    queueCode: qc
                 });
 
-                // Save to history local storage
                 saveOrderHistory(docRef.id);
 
-                // Show Success
-                document.getElementById('cart-modal').classList.add('hidden'); document.getElementById('cart-modal').classList.remove('flex');
-                document.getElementById('success-overlay').classList.remove('hidden'); document.getElementById('success-overlay').classList.add('flex');
+                document.getElementById('cart-modal').classList.add('hidden'); 
+                document.getElementById('cart-modal').classList.remove('flex');
+                document.getElementById('success-overlay').classList.remove('hidden'); 
+                document.getElementById('success-overlay').classList.add('flex');
                 document.getElementById('final-code').textContent = qc; 
                 
-                // Setup WA Button
-                const waMsg = `Halo Admin, saya sudah pesan di web.\n\nKode: *${qc}*\nNama: ${customerName}\nTotal: Rp ${(sub+fee).toLocaleString()}\n\nMohon dikonfirmasi ya, terima kasih!`;
+                const waMsg = `Halo Admin, saya sudah pesan di web.\n\nKode: *${qc}*\nNama: ${customerName}\nTotal: Rp ${(sub+fee).toLocaleString()}\nPembayaran: ${document.getElementById('c-payment').value}\n\nMohon dikonfirmasi ya, terima kasih!`;
                 document.getElementById('wa-confirm-btn').href = `https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(waMsg)}`;
                 
                 confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#ff7e5f', '#feb47b'] });
-                cart=[]; updateCartUI();
-            } catch(err) { console.error(err); showToast("Gagal kirim: "+err.code); btn.innerText="Pesan Sekarang"; btn.disabled=false; }
+                cart=[]; 
+                updateCartUI();
+            } catch(err) { 
+                console.error(err); 
+                showToast("Gagal kirim: "+err.code); 
+                btn.innerText="Pesan & Konfirmasi WA"; 
+                btn.disabled=false; 
+            }
+        }
+
+        // --- Event listener untuk tombol di modal QR (TETAP SAMA) ---
+        document.getElementById('payment-qr-continue').addEventListener('click', async () => {
+            await processOrder();
         });
 
-        // History Logic
+        document.getElementById('payment-qr-cancel').addEventListener('click', () => {
+            document.getElementById('payment-qr-modal').classList.add('hidden');
+            document.getElementById('payment-qr-modal').classList.remove('flex');
+            
+            const btn = document.getElementById('btn-submit');
+            btn.innerText="Pesan & Konfirmasi WA"; 
+            btn.disabled=false;
+        });
+
+
+        // --- LOGIKA HISTORY (TETAP SAMA) ---
         function saveOrderHistory(id) {
             let h = JSON.parse(localStorage.getItem('ork_history') || '[]');
             h.push(id);
@@ -286,7 +414,6 @@
             }
 
             try {
-                // Firestore 'in' query limit is 10, perfect.
                 const q = query(collection(db, COL_ORDERS), where(documentId(), 'in', h));
                 const snap = await getDocs(q);
                 const orders = snap.docs.map(d => d.data()).sort((a,b) => b.timestamp?.seconds - a.timestamp?.seconds);
@@ -303,7 +430,7 @@
                             <div class="flex justify-between items-start mb-2">
                                 <div>
                                     <span class="font-bold text-lg text-slate-800">${o.queueCode}</span>
-                                    <p class="text-xs text-slate-400">${new Date(o.timestamp?.seconds*1000).toLocaleDateString()}</p>
+                                    <p class="text-xs text-slate-400">${new Date(o.timestamp?.seconds*1000).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
                                 </div>
                                 <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${stClass}">${stText}</span>
                             </div>
@@ -327,6 +454,7 @@
         window.openCart = () => { renderCartItems(); document.getElementById('cart-modal').classList.remove('hidden'); document.getElementById('cart-modal').classList.add('flex'); calcTotal(); }
         window.closeCart = () => { document.getElementById('cart-modal').classList.add('hidden'); document.getElementById('cart-modal').classList.remove('flex'); }
     </script>
-    <style> @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } } .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; } </style>
 </body>
 </html>
+
+
