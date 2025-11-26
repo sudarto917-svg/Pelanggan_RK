@@ -231,15 +231,15 @@
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, getDocs, query, where, documentId } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- KONFIGURASI GAMBAR & TOKO ---
-        const QRIS_IMAGE_URL = "https://placehold.co/400x400/FFFFFF/000000?text=QRIS+Rumah+Kita";
-        const DANA_IMAGE_URL = "https://placehold.co/400x400/FFFFFF/000000?text=0882-2866-5260";
+        const QRIS_IMAGE_URL = "https://i.imgur.com/H1qne2I.jpeg";
+        const DANA_IMAGE_URL = "https://i.imgur.com/H1qne2I.jpeg";
         
         // --- SETTING LOKASI TOKO & HARGA ---
         // GANTI KOORDINAT INI DENGAN LOKASI ASLI "RUMAH KITA"
         const STORE_LOCATION = [-7.236509,111.438575]; // Contoh: Monas. Ganti dengan lat,lng toko anda.
         
-        const PRICE_PER_KM = 2000; // Harga per KM
-        const MIN_DELIVERY_FEE = 3000; // Ongkir Minimal
+        const PRICE_PER_KM = 1000; // Harga per KM
+        const MIN_DELIVERY_FEE = 2000; // Ongkir Minimal
 
         // --- VARIABEL MAP ---
         let map, userMarker, routingControl, storeMarker;
