@@ -3,11 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Order Rumah Kita</title>
+    <title>Order Rumah Kita + Map</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- LEAFLET MAP CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+
     <style>
         body { font-family: 'Outfit', sans-serif; background-color: #FFF8F3; }
         .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
@@ -23,6 +29,9 @@
         .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes zoom-in { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .animate-zoom-in { animation: zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* Leaflet Fixes */
+        .leaflet-routing-container { display: none !important; } /* Sembunyikan panel instruksi default */
     </style>
 </head>
 <body class="text-gray-800 pb-28 relative min-h-screen">
@@ -46,7 +55,6 @@
                     <div class="bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5">
                         <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> BUKA
                     </div>
-                    <!-- FITUR JAM BARU -->
                     <div id="clock" class="text-[10px] text-slate-500 font-mono mt-0.5" style="letter-spacing: -0.5px;"></div>
                 </div>
             </div>
@@ -56,7 +64,7 @@
     <div class="pt-20 px-4 max-w-md mx-auto pb-4">
         <div class="mb-6 orange-gradient rounded-3xl p-6 text-white shadow-xl shadow-orange-200 relative overflow-hidden">
              <h2 class="text-2xl font-extrabold relative z-10">Mau Makan Apa?</h2>
-             <p class="relative z-10 text-white/90 text-sm">Ongkir cuma 2rb sesama desa!</p>
+             <p class="relative z-10 text-white/90 text-sm">Ongkir otomatis sesuai jarak!</p>
              <div class="absolute -right-4 -bottom-6 text-8xl opacity-30 rotate-12">🍕</div>
         </div>
 
@@ -70,12 +78,10 @@
 
     <!-- Floating Buttons -->
     <div class="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-30 flex flex-col gap-3">
-        <!-- Contact Admin Button -->
-        <a href="https://wa.me/6288228665260?text=Halo%20Admin%20Outlet%20Rumah%20Kita%2C%20saya%20mau%20tanya..." target="_blank" class="self-end bg-emerald-500 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 hover:bg-emerald-600 transition">
+        <a href="https://wa.me/6288228665260?text=Halo%20Admin..." target="_blank" class="self-end bg-emerald-500 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold flex items-center gap-2 hover:bg-emerald-600 transition">
             <i class="fab fa-whatsapp text-lg"></i> Chat Admin
         </a>
 
-        <!-- Cart Button -->
         <button onclick="openCart()" id="float-cart-btn" class="w-full bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex justify-between items-center transform translate-y-32 transition-transform duration-500">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center font-bold text-sm shadow-lg" id="cart-count">0</div>
@@ -83,6 +89,40 @@
             </div>
             <div class="flex items-center gap-2 text-sm font-bold text-orange-400">Check Out <i class="fas fa-arrow-right"></i></div>
         </button>
+    </div>
+
+    <!-- MAP SELECTION MODAL (BARU) -->
+    <div id="map-modal" class="fixed inset-0 bg-white z-[70] hidden flex-col">
+        <div class="p-4 shadow-md flex justify-between items-center bg-white z-10">
+            <div>
+                <h3 class="font-bold text-lg text-slate-800">Tentukan Lokasi</h3>
+                <p class="text-xs text-slate-500">Geser pin merah ke lokasi Anda</p>
+            </div>
+            <button onclick="closeMapModal()" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><i class="fas fa-times text-slate-500"></i></button>
+        </div>
+        
+        <!-- Wadah Peta -->
+        <div id="map" class="flex-1 bg-slate-100 w-full h-full"></div>
+
+        <div class="p-5 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.1)] z-10 rounded-t-3xl">
+             <div class="flex justify-between items-center mb-4 bg-orange-50 p-3 rounded-xl border border-orange-100">
+                <div>
+                    <p class="text-[10px] text-orange-600 font-bold uppercase tracking-wide">Ongkir Estimasi</p>
+                    <h4 class="font-extrabold text-xl text-slate-800" id="map-price-preview">Rp 0</h4>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm font-bold text-slate-700" id="map-dist-preview">0 km</p>
+                    <p class="text-xs text-slate-400" id="map-time-preview">0 min</p>
+                </div>
+             </div>
+             
+             <!-- Tombol GPS -->
+             <button onclick="getRealLocation()" class="w-full mb-3 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-50">
+                <i class="fas fa-crosshairs text-orange-500"></i> Gunakan Lokasi Saya Saat Ini
+             </button>
+
+             <button onclick="confirmLocation()" id="btn-confirm-loc" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">Pilih Lokasi Ini</button>
+        </div>
     </div>
 
     <!-- History Modal -->
@@ -112,27 +152,45 @@
                     <div class="grid grid-cols-1 gap-3">
                         <input type="text" id="c-name" required placeholder="Nama Lengkap" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium">
                         <input type="tel" id="c-phone" required placeholder="Nomor WhatsApp (08...)" pattern="^08[0-9]{8,}$" title="Format harus 08xxxxxxxx" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium">
-                        <textarea id="c-address" required placeholder="Alamat (Desa/Jalan/RT RW)" rows="2" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium"></textarea>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Jarak</label>
-                            <select id="c-zone" class="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:border-orange-400"><option value="near" data-price="2000">Dekat (2rb)</option><option value="mid" data-price="5000">Luar Desa (5rb)</option><option value="far" data-price="0">Jauh (X)</option></select>
+                        
+                        <!-- ALAMAT MANUAL (Tetap ada sebagai detail patokan) -->
+                        <textarea id="c-address" required placeholder="Detail Alamat (Contoh: Rumah Pagar Hitam, Sebelah Warung)" rows="2" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-orange-400 outline-none text-sm font-medium"></textarea>
+                    
+                        <!-- INPUT MAP (PENGGANTI ZONA) -->
+                        <div class="bg-orange-50 p-3 rounded-xl border border-orange-200">
+                            <label class="text-[10px] font-bold text-orange-600 uppercase mb-2 block tracking-wide">Titik Pengantaran & Ongkir</label>
+                            
+                            <button type="button" onclick="openMapModal()" class="w-full bg-white text-slate-700 px-4 py-3 rounded-lg text-sm font-bold border border-orange-200 hover:bg-orange-100 transition flex items-center justify-between shadow-sm">
+                                <span id="location-status-text" class="truncate">📍 Klik untuk Pilih Lokasi di Peta</span>
+                                <i class="fas fa-chevron-right text-xs text-orange-400"></i>
+                            </button>
+
+                            <!-- Hidden Inputs untuk Data Peta -->
+                            <input type="hidden" id="input-lat">
+                            <input type="hidden" id="input-lng">
+                            <input type="hidden" id="input-dist" value="0">
+                            <input type="hidden" id="input-fee" value="0">
+                            
+                            <p id="route-result-info" class="text-[10px] text-slate-500 mt-2 text-right hidden">Jarak: <span id="lbl-dist">0</span> km | Ongkir: <span id="lbl-fee" class="font-bold text-orange-600">Rp 0</span></p>
                         </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3">
                         <div>
-                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Bayar</label>
-                            <!-- (DIUBAH) Opsi pembayaran disederhanakan -->
-                            <select id="c-payment" class="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:border-orange-400">
-                                <option value="Cash">Cash</option>
-                                <option value="QRIS">QRIS</option>
+                            <label class="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Metode Pembayaran</label>
+                            <select id="c-payment" class="w-full px-3 py-3 rounded-lg bg-slate-50 border border-slate-200 text-sm outline-none focus:border-orange-400 font-medium">
+                                <option value="COD">Bayar di Tempat (COD)</option>
+                                <option value="QRIS">QRIS (Scan Barcode)</option>
+                                <option value="DANA">DANA</option>
                             </select>
                         </div>
                     </div>
-                    <div class="bg-orange-50 p-4 rounded-xl flex justify-between items-center border border-orange-100">
-                         <div class="text-xs text-orange-800"><p>Subtotal: <span id="sum-sub">0</span></p><p>Ongkir: <span id="sum-fee">0</span></p></div>
-                         <div class="text-xl font-extrabold text-orange-600" id="sum-total">Rp 0</div>
+                    
+                    <div class="bg-slate-900 p-4 rounded-xl flex justify-between items-center shadow-lg text-white">
+                         <div class="text-xs text-slate-400"><p>Subtotal: <span id="sum-sub" class="text-white">0</span></p><p>Ongkir: <span id="sum-fee" class="text-orange-400 font-bold">0</span></p></div>
+                         <div class="text-xl font-extrabold" id="sum-total">Rp 0</div>
                     </div>
-                    <button type="submit" id="btn-submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-xl active:scale-95 transition">Pesan & Konfirmasi WA</button>
+                    <button type="submit" id="btn-submit" disabled class="w-full bg-orange-500 text-white py-4 rounded-xl font-bold shadow-xl shadow-orange-200 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed">Pesan & Konfirmasi WA</button>
                 </form>
             </div>
         </div>
@@ -141,12 +199,12 @@
     <!-- Payment QR Modal -->
     <div id="payment-qr-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] hidden items-center justify-center p-6">
         <div class="bg-white w-full max-w-xs rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-zoom-in p-6 text-center">
-            <h2 id="payment-qr-title" class="font-bold text-xl text-slate-800 mb-3">Pembayaran QRIS</h2>
-            <p class="text-sm text-slate-500 mb-4">Silakan scan kode di bawah ini untuk membayar.</p>
+            <h2 id="payment-qr-title" class="font-bold text-xl text-slate-800 mb-3">Pembayaran</h2>
+            <p class="text-sm text-slate-500 mb-4">Silakan scan kode di bawah ini.</p>
             <div class="w-full aspect-square bg-slate-100 rounded-xl mb-4 overflow-hidden">
                 <img id="payment-qr-image" src="" alt="Kode Pembayaran" class="w-full h-full object-contain">
             </div>
-            <button id="payment-qr-continue" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold shadow-xl active:scale-95 transition mb-2">Sudah Bayar & Lanjutkan</form>
+            <button id="payment-qr-continue" class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold shadow-xl active:scale-95 transition mb-2">Sudah Bayar & Lanjutkan</button>
             <button id="payment-qr-cancel" class="w-full text-slate-500 text-sm font-medium py-2">Batal</button>
         </div>
     </div>
@@ -163,16 +221,30 @@
         <button onclick="location.reload()" class="text-slate-400 text-sm font-bold hover:text-slate-600">Tutup</button>
     </div>
 
+    <!-- LEAFLET SCRIPTS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, getDocs, query, where, documentId } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- (DIUBAH) LINK GAMBAR QRIS SUDAH DIMASUKKAN ---
-        const QRIS_IMAGE_URL = "https://i.imgur.com/H1qne2I.jpeg"; // Link QRIS Anda
-        // Link DANA dihapus
-        // --- BATAS UBAH LINK ---
+        // --- KONFIGURASI GAMBAR & TOKO ---
+        const QRIS_IMAGE_URL = "https://placehold.co/400x400/FFFFFF/000000?text=QRIS+Rumah+Kita";
+        const DANA_IMAGE_URL = "https://placehold.co/400x400/FFFFFF/000000?text=0882-2866-5260";
+        
+        // --- SETTING LOKASI TOKO & HARGA ---
+        // GANTI KOORDINAT INI DENGAN LOKASI ASLI "RUMAH KITA"
+        const STORE_LOCATION = [-7.236509,111.438575]; // Contoh: Monas. Ganti dengan lat,lng toko anda.
+        
+        const PRICE_PER_KM = 2000; // Harga per KM
+        const MIN_DELIVERY_FEE = 3000; // Ongkir Minimal
 
+        // --- VARIABEL MAP ---
+        let map, userMarker, routingControl, storeMarker;
+        let tempDistance = 0, tempFee = 0;
+        let mapInitialized = false;
 
         function showToast(msg, icon='info') {
             const box = document.getElementById('toast-container');
@@ -192,27 +264,15 @@
             return `Q-${day}${month}-${random}`;
         }
 
-        // --- FUNGSI JAM DIGITAL ---
         function updateClock() {
             const now = new Date();
             const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-            const day = days[now.getDay()];
-            const date = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = now.getFullYear();
-            const h = String(now.getHours()).padStart(2, '0');
-            const m = String(now.getMinutes()).padStart(2, '0');
-            const s = String(now.getSeconds()).padStart(2, '0');
-            
             const clockEl = document.getElementById('clock');
             if (clockEl) {
-                clockEl.textContent = `${day}, ${date}/${month} ${h}:${m}:${s}`;
+                clockEl.textContent = `${days[now.getDay()]}, ${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
             }
         }
-        setInterval(updateClock, 1000);
-        updateClock();
-        // --- BATAS FUNGSI JAM ---
-
+        setInterval(updateClock, 1000); updateClock();
 
         const firebaseConfig = {
             apiKey: "AIzaSyCVl_0OhaCKRiJ5-qPKwaoMs3q11tHRbys",
@@ -266,85 +326,235 @@
         }
 
         window.updateQty = (id, delta) => { const idx = cart.findIndex(c => c.id === id); if(idx > -1) { cart[idx].qty += delta; if(cart[idx].qty <= 0) cart.splice(idx, 1); renderCartItems(); updateCartUI(); } }
+        
         function updateCartUI() {
             const cnt = cart.reduce((a,b) => a+b.qty, 0); const tot = cart.reduce((a,b) => a+(b.price*b.qty), 0);
             document.getElementById('cart-count').textContent = cnt; document.getElementById('cart-total-display').textContent = 'Rp ' + tot.toLocaleString();
             const btn = document.getElementById('float-cart-btn'); btn.classList.toggle('translate-y-32', cnt === 0); calcTotal();
         }
+        
         function renderCartItems() {
             const el = document.getElementById('cart-items'); if(cart.length===0) { el.innerHTML='<div class="text-center text-slate-400 py-4">Kosong.</div>'; return; }
             el.innerHTML = cart.map(item => `<div class="flex items-center gap-3 bg-white border border-slate-100 p-2 rounded-xl"><div class="w-12 h-12 bg-slate-100 rounded-lg overflow-hidden shrink-0"><img src="${item.imageUrl || `https://placehold.co/100x100/fff7ed/fdba74?text=${item.name.charAt(0)}`}" class="w-full h-full object-cover"></div><div class="flex-1"><h4 class="font-bold text-sm truncate">${item.name}</h4><p class="text-xs text-slate-500">Rp ${item.price.toLocaleString()}</p></div><div class="flex items-center gap-2 bg-slate-50 rounded-full px-2 py-1"><button onclick="updateQty('${item.id}', -1)" class="w-5 h-5 bg-white shadow rounded-full text-xs">-</button><span class="text-sm font-bold w-3 text-center">${item.qty}</span><button onclick="updateQty('${item.id}', 1)" class="w-5 h-5 bg-slate-800 text-white shadow rounded-full text-xs">+</button></div></div>`).join('');
         }
+
+        // --- (DIPERBARUI) FUNGSI TOTAL DENGAN ONGKIR DINAMIS ---
         function calcTotal() {
-            const sub = cart.reduce((a,b) => a+(b.price*b.qty), 0); const zone = document.getElementById('c-zone'); const fee = parseInt(zone.options[zone.selectedIndex].dataset.price); const isFar = zone.value === 'far';
-            document.getElementById('sum-sub').textContent = sub.toLocaleString(); document.getElementById('sum-fee').textContent = fee.toLocaleString(); document.getElementById('sum-total').textContent = 'Rp ' + (sub+fee).toLocaleString();
-            const btn = document.getElementById('btn-submit'); if(isFar || cart.length===0) { btn.disabled=true; btn.classList.add('opacity-50'); } else { btn.disabled=false; btn.classList.remove('opacity-50'); }
+            const sub = cart.reduce((a,b) => a+(b.price*b.qty), 0); 
+            // Ambil fee dari hidden input (hasil kalkulasi map)
+            const fee = parseInt(document.getElementById('input-fee').value) || 0;
+            const dist = parseFloat(document.getElementById('input-dist').value) || 0;
+            
+            document.getElementById('sum-sub').textContent = sub.toLocaleString(); 
+            document.getElementById('sum-fee').textContent = fee.toLocaleString(); 
+            document.getElementById('sum-total').textContent = 'Rp ' + (sub+fee).toLocaleString();
+            
+            // Tombol disable jika cart kosong ATAU jarak belum dipilih (fee 0 dan dist 0)
+            const btn = document.getElementById('btn-submit'); 
+            if(cart.length === 0 || dist === 0) { 
+                btn.disabled=true; 
+            } else { 
+                btn.disabled=false; 
+            }
         }
 
-        document.getElementById('c-zone').addEventListener('change', calcTotal);
 
-        // --- (DIUBAH) LOGIKA SUBMIT FORM DISESUAIKAN ---
+        // --- MAP FUNCTIONS ---
+        window.openMapModal = () => {
+            const modal = document.getElementById('map-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            if(!mapInitialized) {
+                initMap();
+                mapInitialized = true;
+            } else {
+                setTimeout(() => map.invalidateSize(), 300);
+            }
+        }
+
+        window.closeMapModal = () => {
+            const modal = document.getElementById('map-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        window.initMap = () => {
+            // Peta Start di Lokasi Toko
+            map = L.map('map', {zoomControl:false}).setView(STORE_LOCATION, 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            // Icon Toko
+            const storeIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/7541/7541900.png', // Icon Toko
+                iconSize: [32, 32], iconAnchor: [16, 32]
+            });
+            L.marker(STORE_LOCATION, {icon: storeIcon}).addTo(map).bindPopup("<b>Outlet Rumah Kita</b>").openPopup();
+
+            // Icon User (Draggable) - Start agak geser dikit dari toko
+            const userIcon = L.icon({
+                iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // Pin Merah
+                iconSize: [36, 36], iconAnchor: [18, 36]
+            });
+            
+            // Default user marker
+            const defaultUserPos = [STORE_LOCATION[0] + 0.005, STORE_LOCATION[1] + 0.005];
+            userMarker = L.marker(defaultUserPos, {draggable: true, icon: userIcon}).addTo(map);
+
+            // Event saat marker digeser
+            userMarker.on('dragend', function(e) {
+                calculateRoute(e.target.getLatLng());
+            });
+
+            // Event saat peta diklik
+            map.on('click', function(e) {
+                userMarker.setLatLng(e.latlng);
+                calculateRoute(e.latlng);
+            });
+
+            // Hitung awal
+            calculateRoute(L.latLng(defaultUserPos));
+        }
+
+        window.getRealLocation = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const newPos = L.latLng(lat, lng);
+                    
+                    userMarker.setLatLng(newPos);
+                    map.setView(newPos, 16);
+                    calculateRoute(newPos);
+                    showToast("Lokasi ditemukan");
+                }, () => showToast("Gagal mendeteksi GPS"));
+            } else {
+                showToast("GPS tidak didukung");
+            }
+        }
+
+        function calculateRoute(destLatLng) {
+            document.getElementById('btn-confirm-loc').innerText = "Menghitung...";
+            document.getElementById('btn-confirm-loc').disabled = true;
+
+            if (routingControl) map.removeControl(routingControl);
+
+            routingControl = L.Routing.control({
+                waypoints: [
+                    L.latLng(STORE_LOCATION[0], STORE_LOCATION[1]), // Titik Awal (Toko)
+                    destLatLng // Titik Tujuan (User)
+                ],
+                router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+                lineOptions: { styles: [{color: '#00AA13', opacity: 0.8, weight: 6}] },
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: false, // Jangan auto zoom biar user ga pusing
+                show: false
+            }).on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+
+                // Hitung Data
+                const distKm = (summary.totalDistance / 1000).toFixed(1);
+                const timeMins = Math.round(summary.totalTime / 60);
+                
+                // LOGIKA HARGA
+                // Max(Minimal Rp 3000, Jarak * 2000)
+                let calculatedPrice = Math.max(MIN_DELIVERY_FEE, Math.round(distKm * PRICE_PER_KM));
+
+                // Simpan ke Variabel Temp
+                tempDistance = distKm;
+                tempFee = calculatedPrice;
+
+                // Update UI Modal Map
+                document.getElementById('map-dist-preview').innerText = distKm + " km";
+                document.getElementById('map-time-preview').innerText = timeMins + " min";
+                document.getElementById('map-price-preview').innerText = "Rp " + calculatedPrice.toLocaleString();
+
+                document.getElementById('btn-confirm-loc').innerText = "Pilih Lokasi Ini";
+                document.getElementById('btn-confirm-loc').disabled = false;
+
+            }).addTo(map);
+        }
+
+        window.confirmLocation = () => {
+            // Pindahkan data dari Map ke Form Checkout
+            document.getElementById('input-dist').value = tempDistance;
+            document.getElementById('input-fee').value = tempFee;
+            document.getElementById('input-lat').value = userMarker.getLatLng().lat;
+            document.getElementById('input-lng').value = userMarker.getLatLng().lng;
+
+            // Update Tampilan Checkout
+            document.getElementById('location-status-text').innerText = `✅ Lokasi Terpilih (${tempDistance} km)`;
+            document.getElementById('location-status-text').classList.add('text-green-600');
+            
+            document.getElementById('lbl-dist').innerText = tempDistance;
+            document.getElementById('lbl-fee').innerText = "Rp " + tempFee.toLocaleString();
+            document.getElementById('route-result-info').classList.remove('hidden');
+
+            // Hitung ulang total keranjang
+            calcTotal();
+            closeMapModal();
+        }
+
+        // --- SUBMIT ORDER ---
         document.getElementById('order-form').addEventListener('submit', async (e) => {
             e.preventDefault(); 
             if(cart.length === 0) return;
             
             const phone = document.getElementById('c-phone').value.trim();
-            if (!phone.startsWith('08')) { 
-                showToast('Nomor WA harus diawali 08...', 'info'); 
-                return; 
-            }
+            if (!phone.startsWith('08')) { showToast('Nomor WA harus diawali 08...', 'info'); return; }
 
             const paymentMethod = document.getElementById('c-payment').value;
             const btn = document.getElementById('btn-submit'); 
-            btn.innerText = "Memvalidasi..."; 
-            btn.disabled = true;
+            btn.innerText = "Memvalidasi..."; btn.disabled = true;
 
-            if (paymentMethod === 'QRIS') {
-                // Jika QRIS, tampilkan modal dulu
-                openPaymentModal(); // Tidak perlu parameter lagi
+            if (paymentMethod === 'QRIS' || paymentMethod === 'DANA') {
+                openPaymentModal(paymentMethod);
             } else {
-                // Jika Cash, langsung proses
                 await processOrder();
             }
         });
 
-        // --- (DIUBAH) FUNGSI MODAL PEMBAYARAN DISESUAIKAN ---
-        function openPaymentModal() {
+        window.openPaymentModal = (method) => {
             const titleEl = document.getElementById('payment-qr-title');
             const imgEl = document.getElementById('payment-qr-image');
             const modal = document.getElementById('payment-qr-modal');
 
-            // Selalu tampilkan QRIS karena DANA sudah dihapus
-            titleEl.textContent = 'Pembayaran QRIS';
-            imgEl.src = QRIS_IMAGE_URL;
-            imgEl.alt = 'Kode QRIS';
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            if (method === 'QRIS') {
+                titleEl.textContent = 'Pembayaran QRIS';
+                imgEl.src = QRIS_IMAGE_URL;
+            } else { // DANA
+                titleEl.textContent = 'Pembayaran DANA';
+                imgEl.src = DANA_IMAGE_URL;
+            }
+            modal.classList.remove('hidden'); modal.classList.add('flex');
         }
 
-        // --- FUNGSI UNTUK MEMPROSES ORDER (TETAP SAMA) ---
-        async function processOrder() {
+        window.processOrder = async () => {
             const btn = document.getElementById('btn-submit');
-            btn.innerText = "Mengirim..."; 
-            btn.disabled = true;
-            
-            // Tutup modal QR jika terbuka
+            btn.innerText = "Mengirim..."; btn.disabled = true;
             document.getElementById('payment-qr-modal').classList.add('hidden');
             document.getElementById('payment-qr-modal').classList.remove('flex');
             
-            const zone = document.getElementById('c-zone'); 
-            const fee = parseInt(zone.options[zone.selectedIndex].dataset.price);
+            // Ambil data ongkir dari input hidden
+            const fee = parseInt(document.getElementById('input-fee').value);
+            const dist = document.getElementById('input-dist').value;
+            const lat = document.getElementById('input-lat').value;
+            const lng = document.getElementById('input-lng').value;
+
             const sub = cart.reduce((a,b) => a+(b.price*b.qty), 0);
             const qc = generateQueueCode();
             const customerName = document.getElementById('c-name').value;
             const phone = document.getElementById('c-phone').value.trim();
+            const addressDetail = document.getElementById('c-address').value;
             
             try {
                 const docRef = await addDoc(collection(db, COL_ORDERS), {
                     customerName: customerName, 
                     customerPhone: phone,
-                    address: document.getElementById('c-address').value,
+                    address: addressDetail,
+                    location: { lat: lat, lng: lng, distance: dist }, // Simpan koordinat & jarak
                     items: cart, 
                     subtotal: sub, 
                     deliveryFee: fee, 
@@ -364,54 +574,36 @@
                 document.getElementById('success-overlay').classList.add('flex');
                 document.getElementById('final-code').textContent = qc; 
                 
-                const waMsg = `Halo Admin, saya sudah pesan di web.\n\nKode: *${qc}*\nNama: ${customerName}\nTotal: Rp ${(sub+fee).toLocaleString()}\nPembayaran: ${document.getElementById('c-payment').value}\n\nMohon dikonfirmasi ya, terima kasih!`;
+                const waMsg = `Halo Admin, pesanan baru via Web.\n\nKode: *${qc}*\nNama: ${customerName}\nJarak: ${dist} km\nTotal: Rp ${(sub+fee).toLocaleString()}\nLokasi Peta: https://www.google.com/maps?q=${lat},${lng}`;
                 document.getElementById('wa-confirm-btn').href = `https://wa.me/${ADMIN_WA}?text=${encodeURIComponent(waMsg)}`;
                 
                 confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#ff7e5f', '#feb47b'] });
-                cart=[]; 
-                updateCartUI();
+                cart=[]; updateCartUI();
             } catch(err) { 
                 console.error(err); 
                 showToast("Gagal kirim: "+err.code); 
-                btn.innerText="Pesan & Konfirmasi WA"; 
-                btn.disabled=false; 
+                btn.innerText="Pesan & Konfirmasi WA"; btn.disabled=false; 
             }
         }
 
-        // --- Event listener untuk tombol di modal QR (TETAP SAMA) ---
-        document.getElementById('payment-qr-continue').addEventListener('click', async () => {
-            await processOrder();
-        });
-
+        document.getElementById('payment-qr-continue').addEventListener('click', processOrder);
         document.getElementById('payment-qr-cancel').addEventListener('click', () => {
             document.getElementById('payment-qr-modal').classList.add('hidden');
             document.getElementById('payment-qr-modal').classList.remove('flex');
-            
-            const btn = document.getElementById('btn-submit');
-            btn.innerText="Pesan & Konfirmasi WA"; 
-            btn.disabled=false;
+            document.getElementById('btn-submit').innerText="Pesan & Konfirmasi WA"; 
+            document.getElementById('btn-submit').disabled=false;
         });
 
-
-        // --- LOGIKA HISTORY (TETAP SAMA) ---
-        function saveOrderHistory(id) {
-            let h = JSON.parse(localStorage.getItem('ork_history') || '[]');
-            h.push(id);
-            if(h.length > 10) h.shift(); // keep last 10
-            localStorage.setItem('ork_history', JSON.stringify(h));
-        }
-
-        window.openHistory = async () => {
-            const modal = document.getElementById('history-modal');
+        // Functions History (Sama)
+        function saveOrderHistory(id) { let h = JSON.parse(localStorage.getItem('ork_history') || '[]'); h.push(id); if(h.length > 10) h.shift(); localStorage.setItem('ork_history', JSON.stringify(h)); }
+        window.openHistory = async () => { /* (Sama seperti file sebelumnya) */ 
+             const modal = document.getElementById('history-modal');
             const list = document.getElementById('history-list');
             modal.classList.remove('hidden'); modal.classList.add('flex');
             list.innerHTML = '<div class="text-center py-10"><i class="fas fa-circle-notch fa-spin text-slate-400"></i></div>';
 
             const h = JSON.parse(localStorage.getItem('ork_history') || '[]');
-            if(h.length === 0) {
-                list.innerHTML = '<div class="text-center text-slate-400 py-10 text-sm">Belum ada riwayat pesanan di HP ini.</div>';
-                return;
-            }
+            if(h.length === 0) { list.innerHTML = '<div class="text-center text-slate-400 py-10 text-sm">Belum ada riwayat pesanan.</div>'; return; }
 
             try {
                 const q = query(collection(db, COL_ORDERS), where(documentId(), 'in', h));
@@ -419,42 +611,20 @@
                 const orders = snap.docs.map(d => d.data()).sort((a,b) => b.timestamp?.seconds - a.timestamp?.seconds);
 
                 list.innerHTML = orders.map(o => {
-                    let stClass = 'bg-slate-100 text-slate-500';
-                    let stText = 'Pending';
-                    if(o.status === 'confirmed') { stClass = 'bg-emerald-100 text-emerald-600'; stText = 'Dikonfirmasi / Dimasak'; }
-                    if(o.status === 'cancelled') { stClass = 'bg-red-100 text-red-600'; stText = 'Dibatalkan'; }
+                    let stClass = 'bg-slate-100 text-slate-500'; let stText = 'Pending';
+                    if(o.status === 'confirmed') { stClass = 'bg-emerald-100 text-emerald-600'; stText = 'Dikonfirmasi'; }
                     if(o.status === 'completed') { stClass = 'bg-blue-100 text-blue-600'; stText = 'Selesai'; }
 
-                    return `
-                        <div class="bg-white border border-slate-100 p-4 rounded-xl shadow-sm mb-3">
-                            <div class="flex justify-between items-start mb-2">
-                                <div>
-                                    <span class="font-bold text-lg text-slate-800">${o.queueCode}</span>
-                                    <p class="text-xs text-slate-400">${new Date(o.timestamp?.seconds*1000).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                                </div>
-                                <span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${stClass}">${stText}</span>
-                            </div>
-                            <div class="text-sm text-slate-600 mb-2">
-                                ${o.items.map(i => `${i.qty}x ${i.name}`).join(', ')}
-                            </div>
-                            <div class="flex justify-between items-center pt-2 border-t border-slate-50">
-                                <span class="font-bold text-orange-600">Rp ${parseInt(o.total).toLocaleString()}</span>
-                                <a href="https://wa.me/${ADMIN_WA}?text=Halo%20Admin%2C%20cek%20status%20pesanan%20*${o.queueCode}*%20dong." target="_blank" class="text-xs font-bold text-emerald-500 hover:underline">Tanya Admin</a>
-                            </div>
-                        </div>
-                    `;
+                    return `<div class="bg-white border border-slate-100 p-4 rounded-xl shadow-sm mb-3">
+                            <div class="flex justify-between items-start mb-2"><div><span class="font-bold text-lg text-slate-800">${o.queueCode}</span><p class="text-xs text-slate-400">${new Date(o.timestamp?.seconds*1000).toLocaleString('id-ID')}</p></div><span class="px-2 py-1 rounded text-[10px] font-bold uppercase ${stClass}">${stText}</span></div>
+                            <div class="text-sm text-slate-600 mb-2">${o.items.map(i => `${i.qty}x ${i.name}`).join(', ')}</div>
+                            <div class="flex justify-between items-center pt-2 border-t border-slate-50"><span class="font-bold text-orange-600">Rp ${parseInt(o.total).toLocaleString()}</span></div></div>`;
                 }).join('');
-            } catch(e) {
-                list.innerHTML = '<div class="text-center text-red-400 py-10 text-sm">Gagal memuat riwayat.</div>';
-                console.error(e);
-            }
+            } catch(e) { console.error(e); list.innerHTML = 'Error loading history.'; }
         }
         window.closeHistory = () => { document.getElementById('history-modal').classList.add('hidden'); document.getElementById('history-modal').classList.remove('flex'); }
-
         window.openCart = () => { renderCartItems(); document.getElementById('cart-modal').classList.remove('hidden'); document.getElementById('cart-modal').classList.add('flex'); calcTotal(); }
         window.closeCart = () => { document.getElementById('cart-modal').classList.add('hidden'); document.getElementById('cart-modal').classList.remove('flex'); }
     </script>
 </body>
 </html>
-
-
